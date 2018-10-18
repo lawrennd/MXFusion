@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import numpy as np
 from ...common.config import get_default_MXNet_mode
 
 
@@ -84,3 +85,46 @@ class PositiveTransformation(Softplus):
         Initializes as Softplus transformation with 0 offset.
         """
         super(PositiveTransformation, self).__init__(offset=0.)
+
+
+class Logistic(VariableTransformation):
+    """
+    Transformation to constraint a variable to lie between two values.
+    """
+    def __init__(self, lower, upper):
+        """
+        :param lower: Lower bound
+        :param upper: Upper bound
+        """
+        if lower >= upper:
+            raise ValueError('The lower bound is above the upper bound')
+        self._lower, self._upper = lower, upper
+        self._difference = self._upper - self._lower
+
+    def transform(self, var, F=None, dtype=None):
+        """
+        Forward transformation.
+
+        :param var: Variable to be transformed.
+        :type var: mx.ndarray or mx.sym
+        :param F: Mode to run MxNet in.
+        :type F: mxnet.ndarray or mxnet.symbol
+        :param dtype: data type.
+        :type dtype: e.g. np.float32
+        """
+        F = get_default_MXNet_mode() if F is None else F
+        return self._lower + self._difference / (1. + F.exp(-var))
+
+    def inverseTransform(self, out_var, F=None, dtype=None):
+        """
+        Inverse transformation.
+
+        :param out_var: Variable to be transformed.
+        :type out_var: mx.ndarray or mx.sym
+        :param F: Mode to run MxNet in.
+        :type F: mxnet.ndarray or mxnet.symbol
+        :param dtype: data type.
+        :type dtype: e.g. np.float32
+        """
+        F = get_default_MXNet_mode() if F is None else F
+        return F.log(F.clip(out_var - self._lower, 1e-10, np.inf) / F.clip(self._upper - out_var, 1e-10, np.inf))
