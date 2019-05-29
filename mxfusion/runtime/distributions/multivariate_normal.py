@@ -165,4 +165,4 @@ class MultivariateNormalRuntime(DistributionRuntime):
 
         mean = mx.nd.broadcast_axis(self.mean, 0, n_samples)
         cov = mx.nd.broadcast_axis(self.covariance, 0, n_samples)
-        return MultivariateNormal(mean, cov)
+        return MultivariateNormalRuntime(mean, cov)

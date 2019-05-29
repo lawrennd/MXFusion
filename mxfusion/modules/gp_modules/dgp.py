@@ -27,7 +27,7 @@ from ...inference.variational import VariationalInference
 from ...models import Model, Posterior
 from ...modules.module import Module
 from ...util.customop import make_diagonal
-from ...components.dist_impl.multivariate_normal import MultivariateNormal
+from ...runtime.distributions.multivariate_normal import MultivariateNormalRuntime
 
 
 def gaussian_variational_expectation(F, y, variance, f_mean, f_var):
@@ -55,7 +55,7 @@ def dgp_final_layer_samples(F, variables, model, posterior, n_layers, n_samples)
     :return: (samples, mean, variance)
     """
 
-    from ...components.dist_impl.conditional_normal import marginalise_affine_mean_conditional_normal
+    from ...runtime.distributions.conditional_normal import marginalise_affine_mean_conditional_normal
     x = variables[model.X]
 
     samples = x
@@ -99,7 +99,7 @@ def get_q_u(F, layer, posterior, variables):
     S_diag = variables[getattr(posterior, 'qU_cov_diag_' + str(layer))]
     cov = F.linalg.syrk(S_W) + make_diagonal(F, S_diag)
     mu = variables[getattr(posterior, 'qU_mean_' + str(layer))]
-    return MultivariateNormal(mu, cov)
+    return MultivariateNormalRuntime(mu, cov)
 
 
 class DeepGPLogPdf(VariationalInference):

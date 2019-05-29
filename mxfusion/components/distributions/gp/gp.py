@@ -17,7 +17,7 @@ import mxnet as mx
 import numpy as np
 
 from ....common.config import get_default_MXNet_mode
-from ...dist_impl.multivariate_normal import MultivariateNormal
+from ....runtime.distributions.multivariate_normal import MultivariateNormalRuntime
 from ...variables import Variable
 from ..distribution import Distribution
 
@@ -179,4 +179,4 @@ class GaussianProcess(Distribution):
 
         K = mx.nd.expand_dims(self.kernel.K(mx.nd, X, **kernel_params), 1)
         K = mx.nd.broadcast_axis(K, 1, rv_shape[0])
-        return MultivariateNormal(mean, K)
+        return MultivariateNormalRuntime(mean, K)

@@ -283,7 +283,7 @@ class ConditionalGaussianProcess(Distribution):
             mean_shape = (1, n_outputs, (X.shape[1]))
             b = mx.nd.zeros(mean_shape, dtype='float64')
 
-        from ...dist_impl.conditional_normal import AffineMeanConditionalNormal
+        from ....runtime.distributions.conditional_normal import AffineMeanConditionalNormal
         print(F.transpose(KccInvKc, (0, 1, 3, 2)).shape)
         return AffineMeanConditionalNormal(F.transpose(KccInvKc, (0, 1, 3, 2)), b, cov)
 

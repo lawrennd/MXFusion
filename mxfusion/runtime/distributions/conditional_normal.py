@@ -1,5 +1,5 @@
 import mxnet as mx
-from .multivariate_normal import MultivariateNormal
+from .multivariate_normal import MultivariateNormalRuntime
 
 
 class AffineMeanConditionalNormal:
@@ -40,4 +40,4 @@ def marginalise_affine_mean_conditional_normal(p_y_x, p_x):
 
     covariance = F.linalg.gemm2(tmp, p_y_x.A, transpose_b=True) + p_y_x.covariance
     mean = F.linalg.gemm2(p_y_x.A, F.expand_dims(p_x.mean, -1)) + F.expand_dims(p_y_x.b, -1)
-    return MultivariateNormal(mean[:, :, :, 0], covariance)
+    return MultivariateNormalRuntime(mean[:, :, :, 0], covariance)
