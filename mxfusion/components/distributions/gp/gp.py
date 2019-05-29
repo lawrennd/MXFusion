@@ -13,8 +13,11 @@
 # ==============================================================================
 
 
+import mxnet as mx
 import numpy as np
+
 from ....common.config import get_default_MXNet_mode
+from ...dist_impl.multivariate_normal import MultivariateNormal
 from ...variables import Variable
 from ..distribution import Distribution
 
@@ -160,3 +163,20 @@ class GaussianProcess(Distribution):
         replicant._has_mean = self._has_mean
         replicant.kernel = self.kernel.replicate_self(attribute_map)
         return replicant
+
+    def get_joint_distribution(self, X, rv_shape, **kernel_params):
+        """
+        Return p(f|x)
+
+        :param x:
+        :return:
+        """
+
+        if self.has_mean:
+            mean = kernel_params['mean']
+        else:
+            mean = mx.nd.zeros((1,) + rv_shape, dtype='float64')
+
+        K = mx.nd.expand_dims(self.kernel.K(mx.nd, X, **kernel_params), 1)
+        K = mx.nd.broadcast_axis(K, 1, rv_shape[0])
+        return MultivariateNormal(mean, K)

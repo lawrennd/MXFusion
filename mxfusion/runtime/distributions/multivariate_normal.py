@@ -94,7 +94,7 @@ class MultivariateNormalRuntime(DistributionRuntime):
         log_pdf = - logdet_l * D - F.sum(F.sum(F.square(LinvY) + np.log(2. * np.pi), axis=-1), axis=-1) / 2
         return log_pdf
 
-    def draw_samples(self, num_samples=1):
+    def draw_samples(self, num_samples=1, full_cov=True):
         """
         Draw a number of samples from the normal distribution.
 
@@ -108,12 +108,18 @@ class MultivariateNormalRuntime(DistributionRuntime):
 
         num_out_samples = max(num_samples, self.mean.shape[0])
         out_shape = (num_out_samples,) + get_variable_shape(mx.nd, self.mean) + (1,)
-        lmat = self.cholesky
         epsilon = mx.nd.random.normal(shape=out_shape, dtype=self.mean.dtype, ctx=self.mean.context)
+        if full_cov:
+            lmat = self.cholesky
 
-        if lmat.shape[0] != num_out_samples:
-            lmat = mx.nd.broadcast_axis(lmat, axis=0, size=num_out_samples)
-        lmat_eps = mx.nd.linalg.trmm(lmat, epsilon)
+            if lmat.shape[0] != num_out_samples:
+                lmat = mx.nd.broadcast_axis(lmat, axis=0, size=num_out_samples)
+            lmat_eps = mx.nd.linalg.trmm(lmat, epsilon)
+        else:
+            N = self.covariance.shape[-1]
+            # extract diagonal from covariance
+            var = self.covariance[:, :, mx.nd.arange(N), mx.nd.arange(N)]
+            lmat_eps = mx.nd.broadcast_mul(mx.nd.sqrt(var), epsilon)
         return mx.nd.broadcast_add(lmat_eps.sum(-1), self.mean)
 
     def kl_divergence(self, other):
@@ -149,3 +155,14 @@ class MultivariateNormalRuntime(DistributionRuntime):
         return -M/2 + sumlogdiag(L_2) - sumlogdiag(L_1).sum() + \
             mx.nd.square(LinvLs).sum(-1).sum(-1)/2 + \
             mx.nd.square(Linvmu).sum(-1).sum(-1)/2
+
+    def broadcast_to_n_samples(self, n_samples):
+        """
+
+        :param n_samples:
+        :return:
+        """
+
+        mean = mx.nd.broadcast_axis(self.mean, 0, n_samples)
+        cov = mx.nd.broadcast_axis(self.covariance, 0, n_samples)
+        return MultivariateNormal(mean, cov)

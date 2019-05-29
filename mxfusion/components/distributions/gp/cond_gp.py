@@ -13,6 +13,7 @@
 # ==============================================================================
 
 
+import mxnet as mx
 import numpy as np
 from ....common.config import get_default_MXNet_mode
 from ....common.exceptions import ModelSpecificationError
@@ -232,3 +233,61 @@ class ConditionalGaussianProcess(Distribution):
         replicant._has_mean_cond = self._has_mean_cond
         replicant.kernel = self.kernel.replicate_self(attribute_map)
         return replicant
+
+    def get_conditional_distribution(self, X, X_cond, n_outputs, jitter, **kernel_params):
+        """
+        Return p(Y | Y_cond)
+
+        :param X:
+        :return: A conditional
+        :rtype: AffineMeanConditionalNormal
+        """
+        F = mx.nd
+
+        if self._has_mean:
+            mean = kernel_params['mean']
+            del kernel_params['mean']
+
+        if self._has_mean_cond:
+            mean_cond = kernel_params['mean_cond']
+            del kernel_params['mean_cond']
+
+        M = X_cond.shape[-2]
+        K = self.kernel.K(F, X, **kernel_params)
+        Kc = self.kernel.K(F, X_cond, X, **kernel_params)
+        Kcc = self.kernel.K(F, X_cond, **kernel_params) + F.eye(M, dtype=X.dtype) * jitter
+
+        Lcc = F.linalg.potrf(Kcc)
+        LccInvKc = F.linalg.trsm(Lcc, Kc)
+        KccInvKc = F.linalg.trsm(Lcc, LccInvKc, transpose=True)
+
+        cov = K - F.linalg.syrk(LccInvKc, transpose=True) + F.eye(X.shape[-2], dtype=X.dtype) * jitter
+        # FIXME: this should be implemented better
+        print('cov', cov.shape)
+        K_diag = self.kernel.Kdiag(F, X, **kernel_params)
+        var = K_diag - F.sum(F.square(LccInvKc), axis=-2)
+        var = F.expand_dims(var, axis=-1) + jitter
+        var = F.expand_dims(F.eye(X.shape[-2], dtype=X.dtype) * var, 0)
+
+        # cov is always (n_samples, N, N)
+        cov = _add_output_dim(cov, n_outputs)
+        KccInvKc = _add_output_dim(KccInvKc, n_outputs)
+
+        if self._has_mean and self._has_mean_cond:
+            b = mean - F.linalg.trsm(Lcc, mean_cond)
+        elif self._has_mean:
+            b = mean
+        elif self._has_mean_cond:
+            b = F.linalg.trsm(Lcc, mean_cond)
+        else:
+            mean_shape = (1, n_outputs, (X.shape[1]))
+            b = mx.nd.zeros(mean_shape, dtype='float64')
+
+        from ...dist_impl.conditional_normal import AffineMeanConditionalNormal
+        print(F.transpose(KccInvKc, (0, 1, 3, 2)).shape)
+        return AffineMeanConditionalNormal(F.transpose(KccInvKc, (0, 1, 3, 2)), b, cov)
+
+
+def _add_output_dim(array, n_outputs):
+    array = mx.nd.expand_dims(array, 1)
+    return mx.nd.broadcast_axis(array, 1, n_outputs)
